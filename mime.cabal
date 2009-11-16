@@ -19,6 +19,8 @@ library
   else
     build-depends:   base < 3
 
+  build-depends:   bytestring >= 0.9, stringsearch >= 0.2
+
   exposed-modules: Codec.MIME.Type
                    Codec.MIME.Parse
                    Codec.MIME.Utils

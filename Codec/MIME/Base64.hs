@@ -16,13 +16,18 @@
 -- 
 --------------------------------------------------------------------
 module Codec.MIME.Base64 
-        ( encodeRaw         -- :: Bool -> String -> [Word8]
+        ( encodeRaw         -- :: Bool -> [Word8] -> String
         , encodeRawString   -- :: Bool -> String -> String
         , encodeRawPrim     -- :: Bool -> Char -> Char -> [Word8] -> String
 
+        , encodeRawByteString -- :: Bool -> ByteString -> ByteString
+        , encodeRawByteStringPrim -- :: Bool -> Char -> Char -> ByteString -> ByteString
+
         , formatOutput      -- :: Int    -> Maybe String -> String -> String
+        , formatOutputB     -- :: Int    -> Maybe ByteString -> ByteString -> ByteString
 
         , decode            -- :: String -> [Word8]
+        , decodeB           -- :: ByteString -> ByteString
         , decodeToString    -- :: String -> String
         , decodePrim        -- :: Char -> Char -> String -> [Word8]
         ) where
@@ -31,9 +36,15 @@ import Data.Bits
 import Data.Char
 import Data.Word
 import Data.Maybe
+import Data.ByteString.Lazy (ByteString)
+import qualified Data.ByteString.Lazy as B
+import qualified Data.ByteString.Lazy.Char8 as C
 
 encodeRawString :: Bool -> String -> String
-encodeRawString trail xs = encodeRaw trail (map (fromIntegral.ord) xs)
+encodeRawString trail = encodeRaw trail . map (fromIntegral.ord)
+
+encodeRawByteString :: Bool -> ByteString -> ByteString
+encodeRawByteString trail = encodeRawByteStringPrim trail '+' '/'
 
 -- | @formatOutput n mbLT str@ formats @str@, splitting it
 -- into lines of length @n@. The optional value lets you control what
@@ -41,16 +52,30 @@ encodeRawString trail xs = encodeRaw trail (map (fromIntegral.ord) xs)
 formatOutput :: Int -> Maybe String -> String -> String
 formatOutput n mbTerm str
  | n <= 0    = error ("Codec.MIME.Base64.formatOutput: negative line length " ++ show n)
- | otherwise = chop n str
+ | otherwise = chop str
    where
      crlf :: String
      crlf = fromMaybe "\r\n" mbTerm
 
-     chop _ "" = ""
-     chop i xs =
-       case splitAt i xs of
+     chop "" = ""
+     chop xs =
+       case splitAt n xs of
          (as,"") -> as
-         (as,bs) -> as ++ crlf ++ chop i bs
+         (as,bs) -> as ++ crlf ++ chop bs
+
+-- | 'formatOutputB' is like 'formatOutput' but for 'ByteString's
+formatOutputB :: Int -> Maybe ByteString -> ByteString -> ByteString
+formatOutputB n mbTerm
+ | n <= 0    = error ("formatOutputB: negative line length " ++ show n)
+ | otherwise = chop
+   where
+     crlf = fromMaybe (C.pack "\r\n") mbTerm
+
+     chop xs | C.null xs = C.empty
+             | otherwise =
+       case C.splitAt (fromIntegral n) xs of
+         (ys,zs) | C.null zs -> ys
+                 | otherwise -> ys `C.append` crlf `C.append` chop zs
 
 encodeRaw :: Bool -> [Word8] -> String
 encodeRaw trail bs = encodeRawPrim trail '+' '/' bs
@@ -70,6 +95,11 @@ encodeRawPrim trail ch62 ch63 ls = encoder ls
   encoder [x,y] = trailer (take 3 (encode3 f x y 0 "")) "="
   encoder (x:y:z:ws) = encode3 f x y z (encoder ws)
 
+-- as encodeRawPrim but using 'ByteString's
+encodeRawByteStringPrim :: Bool -> Char -> Char -> ByteString -> ByteString
+encodeRawByteStringPrim trail ch62 ch63 =
+  C.pack . encodeRawPrim trail ch62 ch63 . B.unpack
+
 encode3 :: (Word8 -> Char) -> Word8 -> Word8 -> Word8 -> String -> String
 encode3 f a b c rs = 
      f (low6 (w24 `shiftR` 18)) :
@@ -86,17 +116,19 @@ decodeToString :: String -> String
 decodeToString str = map (chr.fromIntegral) $ decode str
 
 decode :: String -> [Word8]
-decode str = decodePrim '+' '/' str
+decode = decodePrim '+' '/'
+
+decodeB :: ByteString -> ByteString
+decodeB = decodeBPrim '+' '/'
 
 decodePrim :: Char -> Char -> String -> [Word8]
-decodePrim ch62 ch63 str =  decoder $ takeUntilEnd str
- where
-  takeUntilEnd "" = []
-  takeUntilEnd ('=':_) = []
-  takeUntilEnd (x:xs) = 
-    case toB64 ch62 ch63 x of
-      Nothing -> takeUntilEnd xs
-      Just b  -> b : takeUntilEnd xs
+decodePrim ch62 ch63 = decoder . toB64s ch62 ch63 . takeWhile (/= '=')
+
+decodeBPrim :: Char -> Char -> ByteString -> ByteString
+decodeBPrim ch62 ch63 = B.pack . decoder . toB64s ch62 ch63 . C.unpack . C.takeWhile (/= '=')
+
+toB64s :: Char -> Char -> [Char] -> [Word8]
+toB64s ch62 ch63 xs = [ w8 | Just w8 <- map (toB64 ch62 ch63) xs ]
 
 decoder :: [Word8] -> [Word8]
 decoder [] = []

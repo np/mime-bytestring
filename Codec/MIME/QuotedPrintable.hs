@@ -12,11 +12,17 @@
 --
 --------------------------------------------------------------------
 module Codec.MIME.QuotedPrintable 
-       ( decode -- :: String -> String
-       , encode -- :: String -> String
+       ( decode  -- :: String -> String
+       , decodeB -- :: ByteString -> ByteString
+       , encode  -- :: String -> String
        ) where
 
 import Data.Char
+import qualified Data.ByteString.Lazy.Char8 as C
+import Control.Monad (guard)
+import Control.Arrow (second)
+import Data.Maybe (fromMaybe)
+--import Test.QuickCheck
 
 -- | 'decode' incoming quoted-printable content, stripping
 -- out soft line breaks and translating @=XY@ sequences
@@ -64,3 +70,24 @@ encodeLength n (x:xs)
    
   ord_0 = ord '0'
   ord_A = ord 'A'
+
+decodeB :: C.ByteString -> C.ByteString
+decodeB s =
+  let (before, after) = second (C.drop 1) $ C.break (=='=') s in
+  if C.null after then s -- we propagate other '=' occurrences.
+  else C.append before $
+   fromMaybe (C.cons '=' $ decodeB after) $ -- make it explicit that we propagate other '=' occurrences.
+     do (x1, after1) <- C.uncons after
+        (x2, after2) <- C.uncons after1
+        if x1 == '\r' && x2 == '\n'
+         then return $ decodeB after2
+         else do guard (isHexDigit x1 && isHexDigit x2)
+                 return $ chr (digitToInt x1 * 16 + digitToInt x2) `C.cons` decodeB after2
+
+{-
+preferOneOf :: [a] -> Either Int a -> a
+preferOneOf choices = either ((choices !!) . (`mod` length choices)) id
+
+prop_decode s = decode s == (C.unpack . decodeB . C.pack $ s)
+prop_decode' = prop_decode . map (preferOneOf ('=':'\r':'\n':' ':['0'..'9']++['a'..'z']))
+-}

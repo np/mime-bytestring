@@ -15,6 +15,7 @@
 module Codec.MIME.Type where
 
 import Data.List ( concatMap, isSuffixOf )
+import Data.ByteString.Lazy (ByteString)
 
 data Type
  = Type
@@ -139,17 +140,20 @@ showMultipart m =
    Extension e -> e
    OtherMulti e -> e
    
-type Content = String
+type Content = String -- deprecated
 
-data MIMEValue = MIMEValue
+data MIMEValue a = MIMEValue
       { mime_val_type     :: Type
       , mime_val_disp     :: Maybe Disposition
-      , mime_val_content  :: MIMEContent
+      , mime_val_content  :: MIMEContent a
       , mime_val_headers  :: [(String,String)]
       , mime_val_inc_type :: Bool
       } deriving ( Show, Eq )
 
-nullMIMEValue :: MIMEValue
+instance Functor MIMEValue where
+  fmap f x = x { mime_val_content = fmap f (mime_val_content x) }
+
+nullMIMEValue :: MIMEValue a
 nullMIMEValue = MIMEValue
       { mime_val_type     = nullType
       , mime_val_disp     = Nothing
@@ -158,11 +162,21 @@ nullMIMEValue = MIMEValue
       , mime_val_inc_type = True
       } 
 
-data MIMEContent 
-  = Single Content
-  | Multi [MIMEValue]
+type MIMEValueS = MIMEValue String
+type MIMEValueB = MIMEValue ByteString
+
+data MIMEContent a
+  = Single a
+  | Multi [MIMEValue a]
     deriving (Eq,Show)
-   
+
+instance Functor MIMEContent where
+  fmap f (Single x) = Single $ f x
+  fmap f (Multi xs) = Multi (fmap (fmap f) xs)
+
+type MIMEContentS = MIMEContent String
+type MIMEContentB = MIMEContent ByteString
+
 data Disposition
  = Disposition
      { dispType   :: DispType

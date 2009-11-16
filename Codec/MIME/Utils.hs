@@ -21,7 +21,7 @@ import Control.Monad ( msum )
 
 -- | Given a parameter name, locate it within a MIME value,
 -- returning the corresponding (sub) MIME value.
-findMultipartNamed :: String -> MIMEValue -> Maybe MIMEValue
+findMultipartNamed :: String -> MIMEValue a -> Maybe (MIMEValue a)
 findMultipartNamed nm mv =
  case mime_val_content mv of
    Multi ms  -> msum (map (findMultipartNamed nm) ms)

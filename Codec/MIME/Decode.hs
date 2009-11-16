@@ -18,18 +18,27 @@ import Data.Char
 
 import Codec.MIME.QuotedPrintable as QP
 import Codec.MIME.Base64 as Base64
+import Data.ByteString.Lazy (ByteString)
+-- import qualified Data.ByteString.Lazy
 
 -- | @decodeBody enc str@ decodes @str@ according to the scheme
 -- specified by @enc@. Currently, @base64@ and @quoted-printable@ are
 -- the only two encodings supported. If you supply anything else
 -- for @enc@, @decodeBody@ returns @str@.
 -- 
-decodeBody :: String -> String -> String
-decodeBody enc body =
+decodeBodyS :: String -> String -> String
+decodeBodyS enc =
  case map toLower enc of
-   "base64"           -> map (chr.fromIntegral) $ Base64.decode body
-   "quoted-printable" -> QP.decode body
-   _ -> body
+   "base64"           -> map (chr.fromIntegral) . Base64.decode
+   "quoted-printable" -> QP.decode
+   _ -> id
+
+decodeBodyB :: String -> ByteString -> ByteString
+decodeBodyB enc =
+ case map toLower enc of
+   "base64"           -> Base64.decodeB
+   "quoted-printable" -> QP.decodeB
+   _ -> id
 
 -- Decoding of RFC 2047's "encoded-words" production
 -- (as used in email-headers and some HTTP header cases
@@ -42,8 +51,8 @@ decodeWord str =
        (cs,_:x:'?':bs)
          | isKnownCharset (map toLower cs) ->
            case toLower x of
-             'q' -> decodeQ cs (break (=='?') bs)
-             'b' -> decodeB cs (break (=='?') bs)
+             'q' -> decodeQletter cs (break (=='?') bs)
+             'b' -> decodeBletter cs (break (=='?') bs)
              _   -> Nothing
        _ -> Nothing
    _ -> Nothing
@@ -55,12 +64,12 @@ decodeWord str =
   dropLang (as,'*':bs) = (as,dropWhile (/='?') bs)
   dropLang (as,bs) = (as,bs)
 
-  decodeQ cset (fs,'?':'=':rs) = Just (fromCharset cset (QP.decode fs),rs)
-  decodeQ _ _ = Nothing
+  decodeQletter cset (fs,'?':'=':rs) = Just (fromCharset cset (QP.decode fs),rs)
+  decodeQletter _ _ = Nothing
 
-  decodeB cset (fs,'?':'=':rs) =
+  decodeBletter cset (fs,'?':'=':rs) =
     Just (fromCharset cset (Base64.decodeToString fs),rs)
-  decodeB _ _ = Nothing
+  decodeBletter _ _ = Nothing
 
   fromCharset _cset cs = cs
 
