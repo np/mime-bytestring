@@ -1,4 +1,4 @@
-name:               mime
+name:               mime-bytestring
 version:            0.3.1
 synopsis:           Working with MIME types.
 description:        Working with MIME types.
