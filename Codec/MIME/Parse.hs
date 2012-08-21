@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeSynonymInstances, PatternGuards #-}
+{-# LANGUAGE FlexibleInstances, TypeSynonymInstances, PatternGuards #-}
 --------------------------------------------------------------------
 -- |
 -- Module    : Codec.MIME.Pare
