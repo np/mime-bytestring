@@ -1,20 +1,20 @@
 --------------------------------------------------------------------
 -- |
 -- Module    : Codec.MIME.Type
--- Copyright : (c) 2006-2009, Galois, Inc. 
+-- Copyright : (c) 2006-2009, Galois, Inc.
 -- License   : BSD3
 --
 -- Maintainer: Sigbjorn Finne <sof@galois.com>
 -- Stability : provisional
 -- Portability: portable
 --
--- 
+--
 -- Representing MIME types and values.
--- 
+--
 --------------------------------------------------------------------
 module Codec.MIME.Type where
 
-import Data.List ( concatMap, isSuffixOf )
+import Data.List (isSuffixOf)
 import Data.ByteString.Lazy (ByteString)
 
 data Type
@@ -35,7 +35,7 @@ showType t = showMIMEType (mimeType t) ++ showMIMEParams (mimeParams t)
 
 showMIMEParams :: [(String,String)] -> String
 showMIMEParams ps = concatMap showP ps
- where 
+ where
   showP (a,b) = ';':' ':a ++ '=':'"':b ++ "\""
 
 
@@ -52,7 +52,7 @@ data MIMEType
    deriving ( Show, Ord, Eq )
 
 showMIMEType :: MIMEType -> String
-showMIMEType t = 
+showMIMEType t =
  case t of
    Application s -> "application/"++s
    Audio s       -> "audio/"++s
@@ -79,13 +79,13 @@ type SubType = String
 type TextType = SubType
 
 subTypeString :: Type -> String
-subTypeString t = 
+subTypeString t =
   case break (=='/') (showMIMEType (mimeType t)) of
    (_,"") -> ""
    (_,_:bs) -> bs
 
 majTypeString :: Type -> String
-majTypeString t = 
+majTypeString t =
   case break (=='/') (showMIMEType (mimeType t)) of
    (as,_) -> as
 
@@ -105,7 +105,7 @@ data Multipart
    deriving ( Show, Ord, Eq )
 
 isXmlBased :: Type -> Bool
-isXmlBased t = 
+isXmlBased t =
   case mimeType t of
      Multipart{} -> False
      _ -> "+xml" `isSuffixOf` subTypeString t
@@ -119,14 +119,14 @@ isXmlType t = isXmlBased t ||
  where
     -- Note: xml-dtd isn't considered an XML type here.
   xml_media_types :: [String]
-  xml_media_types = 
+  xml_media_types =
     [ "xml"
     , "xml-external-parsed-entity"
     ]
-  
+
 
 showMultipart :: Multipart -> String
-showMultipart m = 
+showMultipart m =
  case m of
    Alternative -> "alternative"
    Byteranges  -> "byteranges"
@@ -139,7 +139,7 @@ showMultipart m =
    Signed      -> "signed"
    Extension e -> e
    OtherMulti e -> e
-   
+
 type Content = String -- deprecated
 
 data MIMEValue a = MIMEValue
@@ -160,7 +160,7 @@ nullMIMEValue = MIMEValue
       , mime_val_content  = Multi []
       , mime_val_headers  = []
       , mime_val_inc_type = True
-      } 
+      }
 
 type MIMEValueS = MIMEValue String
 type MIMEValueB = MIMEValue ByteString

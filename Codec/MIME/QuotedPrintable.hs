@@ -1,32 +1,34 @@
 --------------------------------------------------------------------
 -- |
 -- Module    : Codec.MIME.QuotedPrintable
--- Copyright : (c) 2006-2009, Galois, Inc. 
+-- Copyright : (c) 2006-2009, Galois, Inc.
 -- License   : BSD3
 --
 -- Maintainer: Sigbjorn Finne <sof@galois.com>
 -- Stability : provisional
 -- Portability:
 --
--- 
+--
 --
 --------------------------------------------------------------------
-module Codec.MIME.QuotedPrintable 
+module Codec.MIME.QuotedPrintable
        ( decode  -- :: String -> String
        , decodeB -- :: ByteString -> ByteString
        , encode  -- :: String -> String
        ) where
 
 import Data.Char
-import qualified Data.ByteString.Lazy.Char8 as C
+import qualified Data.ByteString.Lazy as L
+import qualified Data.ByteString.Lazy.Char8 as L8
 import Control.Monad (guard)
 import Control.Arrow (second)
 import Data.Maybe (fromMaybe)
+import Data.ByteString.Lazy (ByteString)
 --import Test.QuickCheck
 
 -- | 'decode' incoming quoted-printable content, stripping
 -- out soft line breaks and translating @=XY@ sequences
--- into their decoded byte\/octet. The output encoding\/representation 
+-- into their decoded byte\/octet. The output encoding\/representation
 -- is still a String, not a sequence of bytes.
 decode :: String -> String
 decode "" = ""
@@ -54,7 +56,7 @@ encodeLength :: Int -> String -> String
 encodeLength _ "" = ""
 encodeLength n (x:xs)
  | n >= 72  = '=':'\r':'\n':encodeLength 0 (x:xs)
-encodeLength _ ('=':xs) 
+encodeLength _ ('=':xs)
  = '=':'3':'D':encodeLength 0 xs
 encodeLength n (x:xs)
  | ox >= 0x100 = error ("QuotedPrintable.encode: encountered > 8 bit character: " ++ show (x,ox))
@@ -67,27 +69,27 @@ encodeLength n (x:xs)
   showH v
    | v < 10    = chr (ord_0 + v)
    | otherwise = chr (ord_A + (v-10))
-   
+
   ord_0 = ord '0'
   ord_A = ord 'A'
 
-decodeB :: C.ByteString -> C.ByteString
+decodeB :: ByteString -> ByteString
 decodeB s =
-  let (before, after) = second (C.drop 1) $ C.break (=='=') s in
-  if C.null after then s -- we propagate other '=' occurrences.
-  else C.append before $
-   fromMaybe (C.cons '=' $ decodeB after) $ -- make it explicit that we propagate other '=' occurrences.
-     do (x1, after1) <- C.uncons after
-        (x2, after2) <- C.uncons after1
+  let (before, after) = second (L.drop 1) $ L8.break (=='=') s in
+  if L.null after then s -- we propagate other '=' occurrences.
+  else L.append before $
+   fromMaybe (L8.cons '=' $ decodeB after) $ -- make it explicit that we propagate other '=' occurrences.
+     do (x1, after1) <- L8.uncons after
+        (x2, after2) <- L8.uncons after1
         if x1 == '\r' && x2 == '\n'
          then return $ decodeB after2
          else do guard (isHexDigit x1 && isHexDigit x2)
-                 return $ chr (digitToInt x1 * 16 + digitToInt x2) `C.cons` decodeB after2
+                 return $ chr (digitToInt x1 * 16 + digitToInt x2) `L8.cons` decodeB after2
 
 {-
 preferOneOf :: [a] -> Either Int a -> a
 preferOneOf choices = either ((choices !!) . (`mod` length choices)) id
 
-prop_decode s = decode s == (C.unpack . decodeB . C.pack $ s)
+prop_decode s = decode s == (L.unpack . decodeB . L.pack $ s)
 prop_decode' = prop_decode . map (preferOneOf ('=':'\r':'\n':' ':['0'..'9']++['a'..'z']))
 -}

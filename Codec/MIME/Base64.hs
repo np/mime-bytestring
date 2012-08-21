@@ -1,21 +1,21 @@
 --------------------------------------------------------------------
 -- |
 -- Module    : Codec.MIME.Base64
--- Copyright : (c) 2006-2009, Galois, Inc. 
+-- Copyright : (c) 2006-2009, Galois, Inc.
 -- License   : BSD3
 --
 -- Maintainer: Sigbjorn Finne <sof@galois.com>
 -- Stability : provisional
 -- Portability: portable
 --
--- 
+--
 -- Base64 decoding and encoding routines, multiple entry
 -- points for either depending on use and level of control
 -- wanted over the encoded output (and its input form on the
 -- decoding side.)
--- 
+--
 --------------------------------------------------------------------
-module Codec.MIME.Base64 
+module Codec.MIME.Base64
         ( encodeRaw         -- :: Bool -> [Word8] -> String
         , encodeRawString   -- :: Bool -> String -> String
         , encodeRawPrim     -- :: Bool -> Char -> Char -> [Word8] -> String
@@ -37,8 +37,8 @@ import Data.Char
 import Data.Word
 import Data.Maybe
 import Data.ByteString.Lazy (ByteString)
-import qualified Data.ByteString.Lazy as B
-import qualified Data.ByteString.Lazy.Char8 as C
+import qualified Data.ByteString.Lazy as L
+import qualified Data.ByteString.Lazy.Char8 as L8
 
 encodeRawString :: Bool -> String -> String
 encodeRawString trail = encodeRaw trail . map (fromIntegral.ord)
@@ -69,13 +69,13 @@ formatOutputB n mbTerm
  | n <= 0    = error ("formatOutputB: negative line length " ++ show n)
  | otherwise = chop
    where
-     crlf = fromMaybe (C.pack "\r\n") mbTerm
+     crlf = fromMaybe (L8.pack "\r\n") mbTerm
 
-     chop xs | C.null xs = C.empty
+     chop xs | L.null xs = L.empty
              | otherwise =
-       case C.splitAt (fromIntegral n) xs of
-         (ys,zs) | C.null zs -> ys
-                 | otherwise -> ys `C.append` crlf `C.append` chop zs
+       case L.splitAt (fromIntegral n) xs of
+         (ys,zs) | L.null zs -> ys
+                 | otherwise -> ys `L.append` crlf `L.append` chop zs
 
 encodeRaw :: Bool -> [Word8] -> String
 encodeRaw trail bs = encodeRawPrim trail '+' '/' bs
@@ -89,7 +89,7 @@ encodeRawPrim trail ch62 ch63 ls = encoder ls
   trailer xs ys
    | not trail = xs
    | otherwise = xs ++ ys
-  f = fromB64 ch62 ch63 
+  f = fromB64 ch62 ch63
   encoder []    = []
   encoder [x]   = trailer (take 2 (encode3 f x 0 0 "")) "=="
   encoder [x,y] = trailer (take 3 (encode3 f x y 0 "")) "="
@@ -98,10 +98,10 @@ encodeRawPrim trail ch62 ch63 ls = encoder ls
 -- as encodeRawPrim but using 'ByteString's
 encodeRawByteStringPrim :: Bool -> Char -> Char -> ByteString -> ByteString
 encodeRawByteStringPrim trail ch62 ch63 =
-  C.pack . encodeRawPrim trail ch62 ch63 . B.unpack
+  L8.pack . encodeRawPrim trail ch62 ch63 . L.unpack
 
 encode3 :: (Word8 -> Char) -> Word8 -> Word8 -> Word8 -> String -> String
-encode3 f a b c rs = 
+encode3 f a b c rs =
      f (low6 (w24 `shiftR` 18)) :
      f (low6 (w24 `shiftR` 12)) :
      f (low6 (w24 `shiftR` 6))  :
@@ -109,7 +109,7 @@ encode3 f a b c rs =
    where
     w24 :: Word32
     w24 = (fromIntegral a `shiftL` 16) +
-          (fromIntegral b `shiftL` 8)  + 
+          (fromIntegral b `shiftL` 8)  +
            fromIntegral c
 
 decodeToString :: String -> String
@@ -125,7 +125,7 @@ decodePrim :: Char -> Char -> String -> [Word8]
 decodePrim ch62 ch63 = decoder . toB64s ch62 ch63 . takeWhile (/= '=')
 
 decodeBPrim :: Char -> Char -> ByteString -> ByteString
-decodeBPrim ch62 ch63 = B.pack . decoder . toB64s ch62 ch63 . C.unpack . C.takeWhile (/= '=')
+decodeBPrim ch62 ch63 = L.pack . decoder . toB64s ch62 ch63 . L8.unpack . L8.takeWhile (/= '=')
 
 toB64s :: Char -> Char -> [Char] -> [Word8]
 toB64s ch62 ch63 xs = [ w8 | Just w8 <- map (toB64 ch62 ch63) xs ]
@@ -160,7 +160,7 @@ toB64 a b ch
   | otherwise = Nothing
 
 fromB64 :: Char -> Char -> Word8 -> Char
-fromB64 ch62 ch63 x 
+fromB64 ch62 ch63 x
   | x < 26    = chr (ord 'A' + xi)
   | x < 52    = chr (ord 'a' + (xi-26))
   | x < 62    = chr (ord '0' + (xi-52))
